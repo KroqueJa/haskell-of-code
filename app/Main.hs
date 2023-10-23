@@ -1,4 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE FlexibleInstances #-}
+
+
 {- ========== Imports =========== -}
 import Data.List.Split (splitOn)
 import Data.List (any, isInfixOf, foldl')
@@ -219,25 +222,54 @@ solve2015Day5 lines =
 -- Represent a turned on light with a coordinate
 type Light = (Int, Int)
 
--- Store all turned on lights in a `Set`
 type LightSet = S.Set Light
 type LightMap = M.Map Light Int
 
-type LightFunction = (LightSet -> Light -> LightSet)
-type LightBoxFunction = (LightSet -> [Light] -> LightSet)
+class LightOperation c where
+  toggle :: c -> Light -> c
+  turnOn :: c -> Light -> c
+  turnOff :: c -> Light -> c
+  toggleLights :: c -> [Light] -> c
+  turnOnLights :: c -> [Light] -> c
+  turnOffLights :: c -> [Light] -> c
+
+instance LightOperation (LightSet) where
+  toggle lset light = if S.member light lset then S.delete light lset else S.insert light lset
+  turnOn = flip S.insert
+  turnOff = flip S.delete
+  toggleLights lset light = foldl toggle lset light
+  turnOffLights lset light = foldl turnOff lset light
+  turnOnLights lset light = foldl turnOn lset light
+
+instance LightOperation (LightMap) where
+  toggle lmap light = M.insertWith (+) light 2 lmap
+  turnOn lmap light = M.insertWith (+) light 1 lmap
+  turnOff lmap light = M.alter decreaseToNil light lmap
+    where
+      decreaseToNil :: Maybe Int -> Maybe Int
+      decreaseToNil Nothing = Nothing
+      decreaseToNil (Just n) = if n > 0 then Just (n - 1) else Nothing
+  toggleLights lmap light = foldl toggle lmap light
+  turnOffLights lmap light = foldl turnOff lmap light
+  turnOnLights lmap light = foldl turnOn lmap light
+
 
 -- An input is represented as an `Instruction`, with a helper function to apply it
 data FunctionTag = Toggle | TurnOn | TurnOff | None deriving (Show)
 
-data Instruction = Instruction  {
-                                  function :: LightBoxFunction,
-                                  tag :: FunctionTag,
-                                  topLeft :: (Int, Int),
-                                  botRight :: (Int, Int)
-                                }
+data LightOperation c => Instruction c = Instruction {
+                        function :: c -> [Light] -> c,
+                        tag :: FunctionTag,
+                        topLeft :: Light,
+                        botRight :: Light
+                      }
 
-instance Show Instruction where
-  show instr = "Instruction {" ++ show (tag instr) ++ " " ++ show (topLeft instr) ++ " -> " ++ show (botRight instr) ++ "}"
+applyInstruction :: LightOperation c => c -> Instruction c -> c
+applyInstruction lset (Instruction f _ tl br) = f lset (rectangle tl br)
+  where
+    rectangle :: (Int, Int) -> (Int, Int) -> [(Int, Int)]
+    rectangle (x, y) (p, q) = [(i, j) | i <- [x..p], j <- [y..q]]
+
 
 solve2015Day6 :: Solver
 solve2015Day6 lines =
@@ -246,55 +278,41 @@ solve2015Day6 lines =
     lightSet :: LightSet
     lightSet = S.empty
 
-    -- All instructions
-    instructions :: [Instruction]
-    instructions = parseInstructions lines
+    -- An empty map
+    lightMap :: LightMap
+    lightMap = M.empty
 
-    partOne = tallyLit $ foldl' applyInstruction lightSet instructions
-    partTwo = "Part Two"
+    -- All instructions
+    instructionsPartOne :: [Instruction LightSet]
+    instructionsPartOne = parseInstructions lines
+
+    instructionsPartTwo :: [Instruction LightMap]
+    instructionsPartTwo = parseInstructions lines
+
+    partOne = tallyLit $ foldl' applyInstruction lightSet instructionsPartOne
+    partTwo = sumBrightness $ foldl' applyInstruction lightMap instructionsPartTwo
   in
     return $ "===== Day 6 =====\nPart 1: "
       ++ show partOne ++ "\nPart 2: " ++ show partTwo ++ "\n"
   where
     -- Function to get all the instructions from the input file
-    parseInstructions :: [String] -> [Instruction]
+    parseInstructions :: LightOperation c => [String] -> [Instruction c]
     parseInstructions = map parseLine
       where
-        parseLine :: String -> Instruction
+        parseLine :: LightOperation c => String -> Instruction c
         parseLine str = 
           case parse instructionParser "" str of
             Left err -> error $ "Parse error: " ++ show err
             Right instr -> instr
 
-    -- Helper functions to manipulate the LightSet
-    toggleLight :: LightFunction
-    toggleLight lset light =
-      if S.member light lset
-        then turnOffLight lset light
-      else
-        turnOnLight lset light
-
-    turnOffLight :: LightFunction
-    turnOffLight = flip S.delete
-
-    turnOnLight :: LightFunction
-    turnOnLight = flip S.insert
-
-    toggleLights :: LightBoxFunction
-    toggleLights lset coords = foldl toggleLight lset coords
-
-    turnOffLights :: LightBoxFunction
-    turnOffLights lset coords = foldl turnOffLight lset coords
-
-    turnOnLights :: LightBoxFunction
-    turnOnLights lset coords = foldl turnOnLight lset coords
-
-    -- Function to count all lit lights of a `Grid Light`
     tallyLit :: LightSet -> Int
     tallyLit = S.size
 
+    sumBrightness :: LightMap -> Int
+    sumBrightness = sum . M.elems
+
     -- Parser functions
-    coordinate :: Parser (Int, Int)
+    coordinate :: Parser Light
     coordinate = do
       x <- int
       char ','
@@ -304,7 +322,7 @@ solve2015Day6 lines =
         int :: Parser Int
         int = read <$> many1 digit
 
-    toggleParser :: Parser Instruction
+    toggleParser :: LightOperation c => Parser (Instruction c)
     toggleParser = do
       string "toggle "
       start <- coordinate
@@ -312,7 +330,7 @@ solve2015Day6 lines =
       end <- coordinate
       return $ Instruction toggleLights Toggle start end
 
-    turnOnParser :: Parser Instruction
+    turnOnParser :: LightOperation c => Parser (Instruction c)
     turnOnParser = do
       string "turn on "
       start <- coordinate
@@ -320,7 +338,7 @@ solve2015Day6 lines =
       end <- coordinate
       return $ Instruction turnOnLights TurnOn start end
 
-    turnOffParser :: Parser Instruction
+    turnOffParser :: LightOperation c => Parser (Instruction c)
     turnOffParser = do
       string "turn off "
       start <- coordinate
@@ -328,18 +346,10 @@ solve2015Day6 lines =
       end <- coordinate
       return $ Instruction turnOffLights TurnOff start end
 
-    instructionParser :: Parser Instruction
+    instructionParser :: LightOperation c => Parser (Instruction c)
     instructionParser = try toggleParser <|> try turnOnParser <|> turnOffParser
 
-
-
-    applyInstruction :: LightSet -> Instruction -> LightSet
-    applyInstruction lset (Instruction f _ tl br) = f lset (rectangle tl br)
-      where
-        rectangle :: (Int, Int) -> (Int, Int) -> [(Int, Int)]
-        rectangle (x, y) (p, q) = [(i, j) | i <- [x..p], j <- [y..q]]
-
-
+  
 -- ======= Main =======
 {- Uncomment the solvers you wish to run! -}
 main :: IO ()
