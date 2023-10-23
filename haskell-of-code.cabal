@@ -20,6 +20,7 @@ executable haskell-of-code
     main-is:          Main.hs
     c-sources:        app/solve_day_4.c
     extra-libraries:  ssl crypto
+    other-modules:    Solutions
 
     -- Modules included in this executable, other than Main.
     -- other-modules:

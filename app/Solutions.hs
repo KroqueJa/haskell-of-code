@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 module Solutions where
+
 {- ========== Imports =========== -}
 import Data.List.Split (splitOn)
 import Data.List (any, isInfixOf, foldl')
