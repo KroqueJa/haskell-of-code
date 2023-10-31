@@ -5,15 +5,18 @@ module Solutions where
 
 {- ========== Imports =========== -}
 import Data.List.Split (splitOn)
-import Data.List (any, isInfixOf, foldl')
+import Data.List (any, isInfixOf, foldl', foldl1)
 import Data.Array
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Text.Regex.PCRE
 import Text.Parsec
 import Text.Parsec.String (Parser)
-import Foreign.C.String
+import Data.Bits (complement, shiftR, shiftL, (.|.), (.&.))
+import Data.Word
+import Debug.Trace (trace)
 
+import Foreign.C.String
 import Foreign.C.Types
 foreign import ccall "solve" c_solve :: CString -> CString -> IO CInt
 
@@ -271,7 +274,6 @@ applyInstruction lset (Instruction f _ tl br) = f lset (rectangle tl br)
     rectangle :: (Int, Int) -> (Int, Int) -> [(Int, Int)]
     rectangle (x, y) (p, q) = [(i, j) | i <- [x..p], j <- [y..q]]
 
-
 solve2015Day6 :: Solver
 solve2015Day6 lines =
   let
@@ -350,4 +352,150 @@ solve2015Day6 lines =
     instructionParser :: LightOperation c => Parser (Instruction c)
     instructionParser = try toggleParser <|> try turnOnParser <|> turnOffParser
 
-  
+-- ========== 2015 Day 7 ==========
+
+data Node = Ref String | Const Word16 deriving (Show, Eq, Ord)
+data Operation = AND Node Node
+                  | OR Node Node
+                  | NOT Node
+                  | LSHIFT Node Node
+                  | RSHIFT Node Node
+                  | INPUT Node
+  deriving (Show, Eq, Ord)
+
+type CircuitNode = (Node, Operation)
+type Circuit = M.Map Node Operation
+type Memo = M.Map Node Word16
+
+solve2015Day7 :: Solver
+solve2015Day7 lines =
+  let
+    (partOne, _) = evaluateNode (Ref "a") M.empty $ buildCircuit $ parseLines lines
+    (partTwo, _) = evaluateNode (Ref "a") M.empty $ M.adjust (\_ -> INPUT (Const partOne)) (Ref "b") $ buildCircuit $ parseLines lines
+
+  in
+
+    return $ "===== Day 7 =====\nPart 1: "
+      ++ show partOne ++ "\nPart 2: " ++ show partTwo ++ "\n"
+
+  where
+
+    evaluateNode :: Node -> Memo -> Circuit -> (Word16, Memo)
+    evaluateNode node memo circuit =
+      case M.lookup node memo of
+        Just val -> (val, memo)  -- Memoized value
+        Nothing -> 
+          let (val, newMemo) = case M.lookup node circuit of
+                Nothing -> error $ "Node not found in circuit: " ++ show node
+                Just operation -> 
+                  evaluateOperation operation memo circuit
+          in
+            (val, M.insert node val newMemo)
+
+    evaluateOperation :: Operation -> Memo -> Circuit -> (Word16, Memo)
+    evaluateOperation (AND left right) memo circuit =
+        let (leftVal, memo1) = eval left memo circuit
+            (rightVal, memo2) = eval right memo1 circuit
+        in (leftVal .&. rightVal, memo2)
+    evaluateOperation (OR left right) memo circuit =
+        let (leftVal, memo1) = eval left memo circuit
+            (rightVal, memo2) = eval right memo1 circuit
+        in (leftVal .|. rightVal, memo2)
+    evaluateOperation (LSHIFT left right) memo circuit =
+        let (leftVal, memo1) = eval left memo circuit
+            (rightVal, memo2) = eval right memo1 circuit
+        in (leftVal `shiftL` fromIntegral rightVal, memo2)
+    evaluateOperation (RSHIFT left right) memo circuit =
+        let (leftVal, memo1) = eval left memo circuit
+            (rightVal, memo2) = eval right memo1 circuit
+        in (leftVal `shiftR` fromIntegral rightVal, memo2)
+    evaluateOperation (NOT op) memo circuit =
+        let (opVal, newMemo) = eval op memo circuit
+        in (complement opVal, newMemo)
+    evaluateOperation (INPUT op) memo circuit = eval op memo circuit
+
+    eval :: Node -> Memo -> Circuit -> (Word16, Memo)
+    eval (Const x) memo _ = (x, memo)
+    eval ref@(Ref _) memo circuit = evaluateNode ref memo circuit
+
+    parseLines :: [String] -> [Either ParseError CircuitNode]
+    parseLines lines = map (parse circuitNodeParser "") lines
+
+    buildCircuit :: [Either ParseError CircuitNode] -> Circuit
+    buildCircuit parsedList = M.fromList $ map (either handleError id) parsedList
+      where
+        handleError :: ParseError -> a
+        handleError err = error $ "Parsing failed with error: " ++ show err
+
+    {- === Parsers === -}
+    nodeParser :: Parser Node
+    nodeParser = try constParser <|> refParser
+
+    constParser :: Parser Node
+    constParser = do
+      value <- many1 digit
+      return $ Const (read value)
+
+    refParser :: Parser Node
+    refParser = do
+      ref <- many1 letter
+      return $ Ref ref
+
+    notOperationParser :: Parser Operation
+    notOperationParser = do
+      _ <- string "NOT "
+      operand <- nodeParser
+      return $ NOT operand
+
+    andOperationParser :: Parser Operation
+    andOperationParser = do
+      lvalue <- nodeParser
+      _ <- string " AND "
+      rvalue <- nodeParser
+      return $ AND lvalue rvalue
+
+    orOperationParser :: Parser Operation
+    orOperationParser = do
+      lvalue <- nodeParser
+      _ <- string " OR "
+      rvalue <- nodeParser
+      return $ OR lvalue rvalue
+
+    rshiftOperationParser :: Parser Operation
+    rshiftOperationParser = do
+      lvalue <- nodeParser
+      _ <- string " RSHIFT "
+      rvalue <- nodeParser
+      return $ RSHIFT lvalue rvalue
+
+    lshiftOperationParser :: Parser Operation
+    lshiftOperationParser = do
+      lvalue <- nodeParser
+      _ <- string " LSHIFT "
+      rvalue <- nodeParser
+      return $ LSHIFT lvalue rvalue
+
+    inputOperationParser :: Parser Operation
+    inputOperationParser = do
+      node <- nodeParser
+      return $ INPUT node
+
+    operationParser :: Parser Operation
+    operationParser = try lshiftOperationParser
+                        <|> try rshiftOperationParser
+                        <|> try orOperationParser
+                        <|> try andOperationParser
+                        <|> try notOperationParser
+                        <|> try inputOperationParser
+
+    circuitNodeParser :: Parser CircuitNode
+    circuitNodeParser = do
+      operation <- operationParser
+      _ <- string " -> "
+      outputNode <- nodeParser
+      return (outputNode, operation)
+
+    circuitParser :: Parser Circuit
+    circuitParser = do
+      circuitNodes <- many circuitNodeParser
+      return $ M.fromList circuitNodes
