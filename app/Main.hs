@@ -13,7 +13,7 @@ main = do
                         --InputWrapper "y2015d6.txt" solve2015Day6,
                         InputWrapper "y2015d7.txt" solve2015Day7
                       ]
-  putStrLn "<<<<<<<<<< ======= AoC 2015 ======= >>>>>>>>>>\n\n"
+  putStrLn "\n\n<<<<<<<<<< ======= AoC 2015 ======= >>>>>>>>>>\n\n"
   results <- solve2015 wrappedInputs
   mapM_ putStrLn results
 

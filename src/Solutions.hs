@@ -27,9 +27,15 @@ foreign import ccall "solve" c_solve :: CString -> CString -> IO CInt
 type Solver = [String] -> IO String
 
 data InputWrapper = InputWrapper {
-                      inputPath :: FilePath,
-                      solver :: Solver
-                    }
+                        inputPath :: FilePath,
+                        solver :: Solver
+                      }
+
+{- ========== Solution Formatter ========== -}
+formatSolution :: String -> String -> String -> String
+formatSolution day partOne partTwo = 
+    "========== " ++ day ++ "==========\nPart 1: "
+      ++ partOne ++ "\nPart 2: " ++ partTwo ++ "\n"
 
 {- ========== Wrapping function for solving 2015 ========== -}
 solve2015 :: [InputWrapper] -> IO [String]
@@ -51,11 +57,13 @@ solve2015Day1 :: Solver
 solve2015Day1 (line:_) =
   let
     positions = floorPositions line
+
     partOne = endingFloor positions
     partTwo = firstBasementPosition positions
+
   in
-    return $ "===== Day 1 =====\nPart 1: "
-      ++ show partOne ++ "\nPart 2: " ++ show partTwo ++ "\n"
+    return $ formatSolution "Day 1" (show partOne) (show partTwo)
+
   where
     changeFloor :: Char -> Floor
     changeFloor '(' = 1
@@ -85,9 +93,13 @@ solve2015Day2 lines =
 
     paperNeededForBoxes = sum $ map paperNeededForBox boxes
     ribbonNeededForBoxes = sum $ map ribbonNeededForBox boxes
+
+    partOne = show paperNeededForBoxes
+    partTwo = show ribbonNeededForBoxes
+
   in
-    return $ "===== Day 2 =====\nPart 1: "
-      ++ show paperNeededForBoxes ++ "\nPart 2: " ++ show ribbonNeededForBoxes ++ "\n"
+    return $ formatSolution "Day 2" (show partOne) (show partTwo)
+
   where
     parseDimensions :: String -> [Int]
     parseDimensions = map read . splitOn "x"
@@ -147,8 +159,8 @@ solve2015Day3 (line:_) =
     partTwo = S.size totalVisitedHouses
 
   in
-    return $ "===== Day 3 =====\nPart 1: "
-      ++ show partOne ++ "\nPart 2: " ++ show partTwo ++ "\n"
+    return $ formatSolution "Day 3" (show partOne) (show partTwo)
+
   where
     moveSanta :: House -> Char -> House
     moveSanta (House n e) '^' = House (n+1) e
@@ -169,15 +181,17 @@ patience to tweak it. Sorry!
 -}
 solve2015Day4 :: Solver
 solve2015Day4 (line:_) = do
-  partOne <- withCString line $ \lineStr ->
+  partOneC <- withCString line $ \lineStr ->
              withCString "00000" $ \checkStr ->
              c_solve lineStr checkStr
-  partTwo <- withCString line $ \lineStr ->
+  partTwoC <- withCString line $ \lineStr ->
              withCString "000000" $ \checkStr ->
              c_solve lineStr checkStr
-  return $ "===== Day 4 =====\nPart 1: "
-    ++ show (fromIntegral partOne :: Int) ++ "\nPart 2: "
-    ++ show (fromIntegral partTwo :: Int) ++ "\n"
+
+  let partOne = show (fromIntegral partOneC :: Int)
+  let partTwo = show (fromIntegral partTwoC :: Int)
+
+  return $ formatSolution "Day 4" partOne partTwo
 
 
 -- ========== 2015 Day 5 ==========
@@ -199,9 +213,10 @@ solve2015Day5 lines =
                       ]
     partOne = length $ applyRegexes partOneRegexes lines
     partTwo = length $ applyRegexes partTwoRegexes lines
+
   in
-    return $ "===== Day 5 =====\nPart 1: "
-      ++ show partOne ++ "\nPart 2: " ++ show partTwo ++ "\n"
+    return $ formatSolution "Day 5" (show partOne) (show partTwo)
+
   where
     applyRegexes :: [String] -> [String] -> [String]
     applyRegexes regexes strings = foldl applySingleRegex strings regexes
@@ -233,8 +248,8 @@ solve2015Day6 lines =
     partOne = tallyLit $ foldl' applyInstruction lightSet instructionsPartOne
     partTwo = sumBrightness $ foldl' applyInstruction lightMap instructionsPartTwo
   in
-    return $ "===== Day 6 =====\nPart 1: "
-      ++ show partOne ++ "\nPart 2: " ++ show partTwo ++ "\n"
+    return $ formatSolution "2015 Day 6" (show partOne) (show partTwo)
+
   where
     -- Function to get all the instructions from the input file
     parseInstructions :: LightOperation c => [String] -> [Instruction c]
@@ -263,8 +278,7 @@ solve2015Day7 lines =
 
   in
 
-    return $ "===== Day 7 =====\nPart 1: "
-      ++ show partOne ++ "\nPart 2: " ++ show partTwo ++ "\n"
+    return $ formatSolution "2015 Day 7" (show partOne) (show partTwo)
 
   where
 
@@ -314,4 +328,7 @@ solve2015Day7 lines =
       where
         handleError :: ParseError -> a
         handleError err = error $ "Parsing failed with error: " ++ show err
+
+-- ========== 2015 Day 8 ==========
+
 
