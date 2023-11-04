@@ -1,7 +1,9 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ForeignFunctionInterface, FlexibleInstances  #-}
 
 module Solutions where
+
+import Parsers
+import Types
 
 {- ========== Imports =========== -}
 import Data.List.Split (splitOn)
@@ -12,6 +14,7 @@ import qualified Data.Map.Strict as M
 import Text.Regex.PCRE
 import Text.Parsec
 import Text.Parsec.String (Parser)
+import Text.Parsec.Error (ParseError)
 import Data.Bits (complement, shiftR, shiftL, (.|.), (.&.))
 import Data.Word
 import Debug.Trace (trace)
@@ -70,7 +73,6 @@ solve2015Day1 (line:_) =
 
 -- ========== 2015 Day 2 ==========
 
-data Box = Box { boxLength :: Int, boxWidth :: Int, boxHeight :: Int } deriving (Show)
 
 solve2015Day2 :: Solver
 solve2015Day2 lines =
@@ -124,20 +126,6 @@ solve2015Day2 lines =
     ribbonNeededForBox b = shortestPerimeter b + volumeOfBox b
 
 -- ========== 2015 Day 3 ==========
-data House = House { north :: Int, east :: Int } deriving (Show)
-
-instance Eq House where
-  (House n1 e1) == (House n2 e2) = n1 == n2 && e1 == e2
-
-instance Ord House where
-  compare (House n1 e1) (House n2 e2)
-    | n1 < n2   = LT
-    | n1 > n2   = GT
-    | e1 < e2   = LT
-    | e1 > e2   = GT
-    | otherwise = EQ
-
-
 solve2015Day3 :: Solver
 solve2015Day3 (line:_) =
   let
@@ -224,56 +212,6 @@ solve2015Day5 lines =
 -- ========== 2015 Day 6 ==========
 
 -- Represent a turned on light with a coordinate
-type Light = (Int, Int)
-
-type LightSet = S.Set Light
-type LightMap = M.Map Light Int
-
-class LightOperation c where
-  toggle :: c -> Light -> c
-  turnOn :: c -> Light -> c
-  turnOff :: c -> Light -> c
-  toggleLights :: c -> [Light] -> c
-  turnOnLights :: c -> [Light] -> c
-  turnOffLights :: c -> [Light] -> c
-
-instance LightOperation (LightSet) where
-  toggle lset light = if S.member light lset then S.delete light lset else S.insert light lset
-  turnOn = flip S.insert
-  turnOff = flip S.delete
-  toggleLights lset light = foldl toggle lset light
-  turnOffLights lset light = foldl turnOff lset light
-  turnOnLights lset light = foldl turnOn lset light
-
-instance LightOperation (LightMap) where
-  toggle lmap light = M.insertWith (+) light 2 lmap
-  turnOn lmap light = M.insertWith (+) light 1 lmap
-  turnOff lmap light = M.alter decreaseToNil light lmap
-    where
-      decreaseToNil :: Maybe Int -> Maybe Int
-      decreaseToNil Nothing = Nothing
-      decreaseToNil (Just n) = if n > 0 then Just (n - 1) else Nothing
-  toggleLights lmap light = foldl toggle lmap light
-  turnOffLights lmap light = foldl turnOff lmap light
-  turnOnLights lmap light = foldl turnOn lmap light
-
-
--- An input is represented as an `Instruction`, with a helper function to apply it
-data FunctionTag = Toggle | TurnOn | TurnOff | None deriving (Show)
-
-data LightOperation c => Instruction c = Instruction {
-                        function :: c -> [Light] -> c,
-                        tag :: FunctionTag,
-                        topLeft :: Light,
-                        botRight :: Light
-                      }
-
-applyInstruction :: LightOperation c => c -> Instruction c -> c
-applyInstruction lset (Instruction f _ tl br) = f lset (rectangle tl br)
-  where
-    rectangle :: (Int, Int) -> (Int, Int) -> [(Int, Int)]
-    rectangle (x, y) (p, q) = [(i, j) | i <- [x..p], j <- [y..q]]
-
 solve2015Day6 :: Solver
 solve2015Day6 lines =
   let
@@ -314,58 +252,8 @@ solve2015Day6 lines =
     sumBrightness :: LightMap -> Int
     sumBrightness = sum . M.elems
 
-    -- Parser functions
-    coordinate :: Parser Light
-    coordinate = do
-      x <- int
-      char ','
-      y <- int
-      return (x, y)
-      where
-        int :: Parser Int
-        int = read <$> many1 digit
-
-    toggleParser :: LightOperation c => Parser (Instruction c)
-    toggleParser = do
-      string "toggle "
-      start <- coordinate
-      string " through "
-      end <- coordinate
-      return $ Instruction toggleLights Toggle start end
-
-    turnOnParser :: LightOperation c => Parser (Instruction c)
-    turnOnParser = do
-      string "turn on "
-      start <- coordinate
-      string " through "
-      end <- coordinate
-      return $ Instruction turnOnLights TurnOn start end
-
-    turnOffParser :: LightOperation c => Parser (Instruction c)
-    turnOffParser = do
-      string "turn off "
-      start <- coordinate
-      string " through "
-      end <- coordinate
-      return $ Instruction turnOffLights TurnOff start end
-
-    instructionParser :: LightOperation c => Parser (Instruction c)
-    instructionParser = try toggleParser <|> try turnOnParser <|> turnOffParser
 
 -- ========== 2015 Day 7 ==========
-
-data Node = Ref String | Const Word16 deriving (Show, Eq, Ord)
-data Operation = AND Node Node
-                  | OR Node Node
-                  | NOT Node
-                  | LSHIFT Node Node
-                  | RSHIFT Node Node
-                  | INPUT Node
-  deriving (Show, Eq, Ord)
-
-type CircuitNode = (Node, Operation)
-type Circuit = M.Map Node Operation
-type Memo = M.Map Node Word16
 
 solve2015Day7 :: Solver
 solve2015Day7 lines =
@@ -427,75 +315,3 @@ solve2015Day7 lines =
         handleError :: ParseError -> a
         handleError err = error $ "Parsing failed with error: " ++ show err
 
-    {- === Parsers === -}
-    nodeParser :: Parser Node
-    nodeParser = try constParser <|> refParser
-
-    constParser :: Parser Node
-    constParser = do
-      value <- many1 digit
-      return $ Const (read value)
-
-    refParser :: Parser Node
-    refParser = do
-      ref <- many1 letter
-      return $ Ref ref
-
-    notOperationParser :: Parser Operation
-    notOperationParser = do
-      _ <- string "NOT "
-      operand <- nodeParser
-      return $ NOT operand
-
-    andOperationParser :: Parser Operation
-    andOperationParser = do
-      lvalue <- nodeParser
-      _ <- string " AND "
-      rvalue <- nodeParser
-      return $ AND lvalue rvalue
-
-    orOperationParser :: Parser Operation
-    orOperationParser = do
-      lvalue <- nodeParser
-      _ <- string " OR "
-      rvalue <- nodeParser
-      return $ OR lvalue rvalue
-
-    rshiftOperationParser :: Parser Operation
-    rshiftOperationParser = do
-      lvalue <- nodeParser
-      _ <- string " RSHIFT "
-      rvalue <- nodeParser
-      return $ RSHIFT lvalue rvalue
-
-    lshiftOperationParser :: Parser Operation
-    lshiftOperationParser = do
-      lvalue <- nodeParser
-      _ <- string " LSHIFT "
-      rvalue <- nodeParser
-      return $ LSHIFT lvalue rvalue
-
-    inputOperationParser :: Parser Operation
-    inputOperationParser = do
-      node <- nodeParser
-      return $ INPUT node
-
-    operationParser :: Parser Operation
-    operationParser = try lshiftOperationParser
-                        <|> try rshiftOperationParser
-                        <|> try orOperationParser
-                        <|> try andOperationParser
-                        <|> try notOperationParser
-                        <|> try inputOperationParser
-
-    circuitNodeParser :: Parser CircuitNode
-    circuitNodeParser = do
-      operation <- operationParser
-      _ <- string " -> "
-      outputNode <- nodeParser
-      return (outputNode, operation)
-
-    circuitParser :: Parser Circuit
-    circuitParser = do
-      circuitNodes <- many circuitNodeParser
-      return $ M.fromList circuitNodes
