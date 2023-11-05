@@ -11,7 +11,8 @@ main = do
                         --InputWrapper "y2015d4.txt" solve2015Day4,
                         --InputWrapper "y2015d5.txt" solve2015Day5,
                         --InputWrapper "y2015d6.txt" solve2015Day6,
-                        InputWrapper "y2015d7.txt" solve2015Day7
+                        --InputWrapper "y2015d7.txt" solve2015Day7,
+                        InputWrapper "y2015d8.txt" solve2015Day8
                       ]
   putStrLn "\n\n<<<<<<<<<< ======= AoC 2015 ======= >>>>>>>>>>\n\n"
   results <- solve2015 wrappedInputs

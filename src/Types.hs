@@ -87,4 +87,7 @@ type CircuitNode = (Node, Operation)
 type Circuit = M.Map Node Operation
 type Memo = M.Map Node Word16
 
+-- ========== 2015 Day 8 ==========
+data SantaChar c = Plain c | Escaped c | HexValue deriving (Show)
+type SantaString = [SantaChar Char]
 

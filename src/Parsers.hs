@@ -118,3 +118,32 @@ circuitParser :: Parser Circuit
 circuitParser = do
   circuitNodes <- many circuitNodeParser
   return $ M.fromList circuitNodes
+
+{- ======== 2015 Day 8 ======== -}
+santaStringParser :: Parser SantaString
+santaStringParser = many (try santaCharParser)
+
+santaCharParser :: Parser (SantaChar Char)
+santaCharParser = try hexParser
+                    <|> try escapedParser
+                    <|> try plainParser
+
+plainParser :: Parser (SantaChar Char) 
+plainParser = do
+  c <- noneOf "\\"
+  return $ Plain c
+
+escapedParser :: Parser (SantaChar Char)
+escapedParser = do
+  char '\\'
+  c <- noneOf "x"
+  return $ Escaped c
+
+hexParser :: Parser (SantaChar Char)
+hexParser = do
+  char '\\'
+  char 'x'
+  count 2 anyChar
+  return HexValue
+
+

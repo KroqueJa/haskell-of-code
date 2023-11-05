@@ -9,6 +9,7 @@ import Types
 import Data.List.Split (splitOn)
 import Data.List (any, isInfixOf, foldl', foldl1)
 import Data.Array
+import Data.Either (rights)
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Text.Regex.PCRE
@@ -193,7 +194,6 @@ solve2015Day4 (line:_) = do
 
   return $ formatSolution "Day 4" partOne partTwo
 
-
 -- ========== 2015 Day 5 ==========
 
 solve2015Day5 :: Solver
@@ -330,5 +330,32 @@ solve2015Day7 lines =
         handleError err = error $ "Parsing failed with error: " ++ show err
 
 -- ========== 2015 Day 8 ==========
+solve2015Day8 :: Solver
+solve2015Day8 lines =
+  let
+    noSurroundingQuotes :: [String]
+    noSurroundingQuotes = map interior lines
 
+    santaStrings :: [SantaString]
+    santaStrings = rights $ map (parse santaStringParser "") noSurroundingQuotes
+
+    totalChars :: Int
+    totalChars = sum $ map length lines
+
+    totalSantaChars :: Int
+    totalSantaChars = sum $ map length santaStrings
+
+    partOne = show $ totalChars - totalSantaChars
+
+    partTwo = show $ sum $ map addedFromQuotesAndSlashes lines
+
+  in
+    return $ formatSolution "2015 Day 8" partOne partTwo
+
+  where
+    addedFromQuotesAndSlashes :: String -> Int
+    addedFromQuotesAndSlashes = (+4) . length . filter (`elem` ['\\', '"']) . interior
+
+    interior :: (Eq a) => [a] -> [a]
+    interior = tail . init
 
