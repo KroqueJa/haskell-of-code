@@ -7,7 +7,7 @@ import Types
 
 {- ========== Imports =========== -}
 import Data.List.Split (splitOn)
-import Data.List (any, isInfixOf, foldl', foldl1)
+import Data.List (any, isInfixOf, foldl', foldl1, permutations)
 import Data.Array
 import Data.Either (rights)
 import qualified Data.Set as S
@@ -19,6 +19,7 @@ import Text.Parsec.Error (ParseError)
 import Data.Bits (complement, shiftR, shiftL, (.|.), (.&.))
 import Data.Word
 import Debug.Trace (trace)
+import Data.Maybe (fromJust)
 
 import Foreign.C.String
 import Foreign.C.Types
@@ -358,4 +359,67 @@ solve2015Day8 lines =
 
     interior :: (Eq a) => [a] -> [a]
     interior = tail . init
+
+-- ========== 2015 Day 9 ==========
+solve2015Day9 :: Solver
+solve2015Day9 lines =
+  let
+    -- Parse all information into our datatype
+    trips :: [Trip]
+    trips = rights $ map (parse tripParser "") lines
+
+    -- Create a distance catalog and a list of unique towns
+    distanceCatalog :: DistanceCatalog
+    distanceCatalog = buildCatalog $ trips
+
+    uniqueTowns :: [TownID]
+    uniqueTowns =
+      let
+        froms = map (town1 . towns) trips
+        tos = map (town2 . towns) trips
+        fromSet = S.fromList froms
+        toSet = S.fromList tos
+      in
+        S.toList $ S.union fromSet toSet
+
+    -- Create all possible permutations of the unique towns
+    allRoutes :: [Route]
+    allRoutes = permutations uniqueTowns
+
+    -- Form town pairs out of each such permutation
+    allPairs :: [[TownPair]]
+    allPairs = map formPairs allRoutes
+
+    -- For each such town pair, look the distance up in the DistanceCatalog
+    allDistances :: [[Int]]
+    allDistances = map (calculateDistances distanceCatalog) allPairs
+
+    -- Sum each set of distances
+    allTotalDistances :: [Int]
+    allTotalDistances = map sum allDistances
+
+    -- The solution to part one is now the minimum distance
+    partOne = show $ minimum allTotalDistances
+
+    -- The solution to part two is trivial
+    partTwo = show $ maximum allTotalDistances
+
+  in
+    return $ formatSolution "2015 Day 9" partOne partTwo
+
+  where
+    calculateDistances :: M.Map TownPair Int -> [TownPair] -> [Int]
+    calculateDistances m = map (fromJust . (`M.lookup` m))
+
+
+    formPairs :: Route -> [TownPair]
+    formPairs [] = []
+    formPairs [t1,t2] = [TownPair t1 t2]
+    formPairs (t1:t2:ts) = let p = TownPair t1 t2 in p : formPairs (t2:ts)
+
+    buildCatalog :: [Trip] -> DistanceCatalog
+    buildCatalog = M.fromList . map tripToEntry
+      where
+        tripToEntry :: Trip -> (TownPair, Int)
+        tripToEntry (Trip towns d) = (towns, d)
 

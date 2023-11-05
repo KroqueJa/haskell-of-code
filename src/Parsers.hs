@@ -146,4 +146,13 @@ hexParser = do
   count 2 anyChar
   return HexValue
 
+{- ======== 2015 Day 9 ======== -}
+tripParser :: Parser Trip
+tripParser = do
+  t1 <- many1 letter
+  _ <- string " to "
+  t2 <- many1 letter
+  _ <- string " = "
+  dist <- many1 digit
+  return Trip { towns = TownPair { town1 = t1, town2 = t2 }, tripDistance = (read dist) }
 

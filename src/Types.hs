@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Types where
 
+import Data.List (sort)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Word
@@ -90,4 +91,32 @@ type Memo = M.Map Node Word16
 -- ========== 2015 Day 8 ==========
 data SantaChar c = Plain c | Escaped c | HexValue deriving (Show)
 type SantaString = [SantaChar Char]
+
+-- ========== 2015 Day 9 ==========
+type TownID = String
+
+-- Define a `TownPair` because we want the order of the entries to not matter (so a tuple won't do)
+data TownPair = TownPair { town1 :: TownID, town2 :: TownID } deriving (Show)
+
+-- Define equality between `TownPair` such that the order of the towns doesn't matter
+instance Eq TownPair where
+  (TownPair t1 t2) == (TownPair t1' t2') =
+    sort [t1, t2] == sort [t1', t2']
+
+-- Similarly, define ordinality such that the order of the towns doesn't matter
+instance Ord TownPair where
+  compare (TownPair t1 t2) (TownPair t1' t2') =
+    compare (sort [t1, t2]) (sort [t1', t2'])
+
+-- A datatype to parse the input into
+data Trip = Trip {
+                    towns :: TownPair,
+                    tripDistance :: Int
+                  } deriving (Show)
+
+-- Catalog of all distances
+type DistanceCatalog = M.Map TownPair Int
+type Route = [TownID]
+
+
 
