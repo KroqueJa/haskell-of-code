@@ -2,55 +2,30 @@
 
 module Solutions where
 
+import Solver
 import Parsers
 import Types
 
 {- ========== Imports =========== -}
-import Data.List.Split (splitOn)
-import Data.List (any, isInfixOf, foldl', foldl1, permutations)
 import Data.Array
-import Data.Either (rights)
-import qualified Data.Set as S
-import qualified Data.Map.Strict as M
-import Text.Regex.PCRE
-import Text.Parsec
-import Text.Parsec.String (Parser)
-import Text.Parsec.Error (ParseError)
 import Data.Bits (complement, shiftR, shiftL, (.|.), (.&.))
+import Data.Char (ord, chr)
+import Data.Either (rights)
+import Data.List (any, isInfixOf, foldl', foldl1, permutations)
+import Data.List.Split (splitOn)
+import Data.Maybe (fromJust)
 import Data.Word
 import Debug.Trace (trace)
-import Data.Maybe (fromJust)
+import Text.Parsec
+import Text.Parsec.Error (ParseError)
+import Text.Parsec.String (Parser)
+import Text.Regex.PCRE
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 
 import Foreign.C.String
 import Foreign.C.Types
 foreign import ccall "solve" c_solve :: CString -> CString -> IO CInt
-
-{- ========== Types ========== -}
-type Solver = [String] -> IO String
-
-data InputWrapper = InputWrapper {
-                        inputPath :: FilePath,
-                        solver :: Solver
-                      }
-
-{- ========== Solution Formatter ========== -}
-formatSolution :: String -> String -> String -> String
-formatSolution day partOne partTwo = 
-    "========== " ++ day ++ "==========\nPart 1: "
-      ++ partOne ++ "\nPart 2: " ++ partTwo ++ "\n"
-
-{- ========== Wrapping function for solving 2015 ========== -}
-solve2015 :: [InputWrapper] -> IO [String]
-solve2015 wrappedInputs = do
-  let solverActions = fmap applySolver wrappedInputs
-  sequence solverActions
-  where
-    applySolver :: InputWrapper -> IO String
-    applySolver (InputWrapper path solverFn) = do
-      content <- readFile path
-      let linesOfContent = lines content
-      solverFn linesOfContent
-
 
 -- ======= 2015 Day 1 =======
 type Floor = Int
@@ -209,7 +184,7 @@ solve2015Day5 lines =
                         "^(?:(?!xy).)*$"      -- not `xy`
                       ]
     partTwoRegexes =  [
-                        "(..).*\\1",
+                        "(..).*\\1",          -- two pairs of letters with no overlap
                         "(.).\\1"             -- a char surrounded by a pair
                       ]
     partOne = length $ applyRegexes partOneRegexes lines
@@ -423,3 +398,144 @@ solve2015Day9 lines =
         tripToEntry :: Trip -> (TownPair, Int)
         tripToEntry (Trip towns d) = (towns, d)
 
+-- ========== 2015 Day 10 ==========
+solve2015Day10 :: Solver
+solve2015Day10 lines =
+  let
+    singleInput = head lines
+
+
+    partOne = day10 40 singleInput
+    partTwo = day10 50 singleInput
+
+  in
+    return $ formatSolution "2015 Day 10" partOne partTwo
+
+  where
+    -- Wrapper function in the wrapper function because the parts are so similar
+    day10 :: Int -> String -> String
+    day10 n s = show $ length $ applyNTimes n lookAndSay s
+
+    lookAndSay :: String -> String
+    lookAndSay "" = ""
+    lookAndSay s = let f = lookAndSayOne s in f ++ (lookAndSay (dropWhileHead s))
+
+    lookAndSayOne :: String -> String
+    lookAndSayOne s = let subl = takeWhileHead s in (show (length subl)) ++ (take 1 s)
+
+    applyNTimes :: Int -> (a -> a) -> a -> a
+    applyNTimes n f x = (iterate f x) !! n
+
+    -- Some partial function application which is super readable and easy to follow
+    doWhileHead :: (Eq a) => ((a -> Bool) -> [a] -> [a]) -> [a] -> [a]
+    doWhileHead = ((==) . head >>=)
+
+    takeWhileHead :: (Eq a) => [a] -> [a]
+    takeWhileHead = doWhileHead takeWhile
+
+    dropWhileHead :: (Eq a) => [a] -> [a]
+    dropWhileHead = doWhileHead dropWhile
+
+-- ========== 2015 Day 11 ==========
+
+-- Data type to represent integer of any base
+data IntB = IntB { base :: Int, digits :: [Int] }
+            deriving (Show)
+
+instance Eq IntB where
+  (IntB b1 ds1) == (IntB b2 ds2)
+    | b1 == b2 = ds1 == ds2
+    | otherwise = error "Bases must be the same"
+
+instance Num IntB where
+  (+) (IntB b1 ds1) (IntB b2 ds2)
+    | b1 == b2 = IntB b1 (reverse (addWithCarry b1 (reverse ds1) (reverse ds2) 0))
+    | otherwise = error "Bases must be the same"
+  (-) = undefined
+  (*) = undefined
+  abs = undefined
+  signum = undefined
+  fromInteger = undefined
+
+addWithCarry :: Int -> [Int] -> [Int] -> Int -> [Int]
+addWithCarry base [] [] carry
+  | carry == 0 = []
+  | otherwise = [carry]
+addWithCarry base (d1:ds1) (d2:ds2) carry =
+  let
+    initialSum = d1 + d2 + carry
+    newDigit = initialSum `mod` base
+    newCarry = initialSum `div` base
+  in
+    newDigit : addWithCarry base ds1 ds2 newCarry
+addWithCarry base ds1 [] carry = addWithCarry base ds1 [0] carry
+addWithCarry base [] ds2 carry = addWithCarry base [0] ds2 carry
+
+solve2015Day11 :: Solver
+solve2015Day11 lines =
+  let
+    singleInput = head lines
+
+    lettersAsDigits :: [Int]
+    lettersAsDigits = map (\x -> x - 97) $ map ord singleInput
+
+    baseRep :: IntB
+    baseRep = IntB { base = 26, digits = lettersAsDigits }
+
+    one :: IntB
+    one = IntB { base = 26, digits = [1] }
+
+    nextPwd :: String
+    nextPwd = intbToString $ applyUntil (checkPassword) (+ one) baseRep
+
+    partOne = nextPwd
+    partTwo = "Part Two"
+
+  in
+    return $ formatSolution "2015 Day 11" partOne partTwo
+
+  where
+    intbToString :: IntB -> String
+    intbToString intb = let ds = digits intb in map chr $ map (+97) ds
+
+    checkPassword :: IntB -> Bool
+    checkPassword (IntB _ digits) = isValidPassword digits
+
+    (.&&.) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+    f .&&. g = (\x -> f x && g x)
+
+    isValidPassword :: (Eq a, Num a) => [a] -> Bool
+    isValidPassword = hasRisingTrip .&&. (not . (hasElem [8, 11, 14])) .&&. hasTwoPairs
+
+    hasRisingTrip :: (Num a, Eq a) => [a] -> Bool
+    hasRisingTrip [] = False
+    hasRisingTrip [_] = False
+    hasRisingTrip [_, _] = False
+    hasRisingTrip (x1:x2:x3:xs)
+      | x2 - x1 == 1 && x3 - x2 == 1 = True
+      | otherwise = hasRisingTrip (x2:x3:xs)
+
+    hasElem :: (Eq a) => [a] -> [a] -> Bool
+    hasElem elems toCheck = any (`elem` elems) toCheck
+
+    hasTwoPairs :: (Eq a) => [a] -> Bool
+    hasTwoPairs [] = False
+    hasTwoPairs [x] = False
+    hasTwoPairs (x1:x2:xs)
+      | x1 == x2 = hasPair xs
+      | otherwise = hasTwoPairs (x2:xs)
+
+    hasPair :: (Eq a) => [a] -> Bool
+    hasPair [] = False
+    hasPair [x] = False
+    hasPair (x1:x2:xs)
+      | x1 == x2 = True
+      | otherwise = hasPair xs
+
+    applyUntil :: (a -> Bool) -> (a -> a) -> a -> a
+    applyUntil predicate function value =
+      let
+        newValue = function value
+      in
+        if predicate newValue then newValue
+        else applyUntil predicate function newValue
