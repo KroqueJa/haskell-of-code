@@ -9,12 +9,13 @@ import Types
 {- ========== Imports =========== -}
 import Data.Array
 import Data.Bits (complement, shiftR, shiftL, (.|.), (.&.))
-import Data.Char (ord, chr)
+import Data.Char (ord, chr, isDigit)
 import Data.Either (rights)
-import Data.List (any, isInfixOf, foldl', foldl1, permutations)
+import Data.List (any, isPrefixOf, stripPrefix, isInfixOf, foldl', foldl1, permutations)
 import Data.List.Split (splitOn)
 import Data.Maybe (fromJust)
 import Data.Word
+import qualified Data.Text as T
 import Debug.Trace (trace)
 import Text.Parsec
 import Text.Parsec.Error (ParseError)
@@ -539,3 +540,48 @@ solve2015Day11 lines =
       in
         if predicate newValue then newValue
         else applyUntil predicate function newValue
+
+-- ========== 2023 Day 1 ==========
+
+solve2023Day1 :: Solver
+solve2023Day1 lines =
+  let
+    example = [
+            "two1nine",
+            "eightwothree",
+            "abcone2threexyz",
+            "xtwone3four",
+            "4nineeightseven2",
+            "zoneight234",
+            "7pqrstsixteen"
+              ]
+
+    partOne = show $ sum $ map buildNumber $ lines
+    partTwo = show $ sum $ map buildNumber $ map replaceNumberWords $ lines
+  in
+    return $ formatSolution "2023 Day 1" partOne partTwo
+  where
+    buildNumber :: String -> Int
+    buildNumber s = read $ (firstDigitOf s) : [lastDigitOf s]
+
+    firstDigitOf :: String -> Char
+    firstDigitOf = head . dropWhile (not . isDigit)
+
+    lastDigitOf :: String -> Char
+    lastDigitOf = firstDigitOf . reverse
+
+    replaceNumberWords :: String -> String
+    replaceNumberWords "" = ""
+    replaceNumberWords (c:cs)
+      | "one" `isPrefixOf` (c:cs) = "1" ++ replaceNumberWords cs
+      | "two" `isPrefixOf` (c:cs) = "2" ++ replaceNumberWords cs
+      | "three" `isPrefixOf` (c:cs) = "3" ++ replaceNumberWords cs
+      | "four" `isPrefixOf` (c:cs) = "4" ++ replaceNumberWords cs
+      | "five" `isPrefixOf` (c:cs) = "5" ++ replaceNumberWords cs
+      | "six" `isPrefixOf` (c:cs) = "6" ++ replaceNumberWords cs
+      | "seven" `isPrefixOf` (c:cs) = "7" ++ replaceNumberWords cs
+      | "eight" `isPrefixOf` (c:cs) = "8" ++ replaceNumberWords cs
+      | "nine" `isPrefixOf` (c:cs) = "9" ++ replaceNumberWords cs
+      | otherwise = c : replaceNumberWords cs
+
+
