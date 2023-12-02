@@ -156,3 +156,34 @@ tripParser = do
   dist <- many1 digit
   return Trip { towns = TownPair { town1 = t1, town2 = t2 }, tripDistance = (read dist) }
 
+{- ======== 2023 Day 2 ======== -}
+gameIdParser :: Parser GameID
+gameIdParser = do
+  _ <- string "Game "
+  gid <- many1 digit
+  return $ (read :: String -> GameID) gid
+
+gameDrawParser :: Parser GameDraw
+gameDrawParser = do
+  num <- many1 digit
+  _ <- string " "
+  color <- many1 letter
+  case color of
+    "green" -> return $ GameDraw Green $ (read :: String -> Int) num
+    "red" -> return $ GameDraw Red $ (read :: String -> Int) num
+    "blue" -> return $ GameDraw Blue $ (read :: String -> Int) num
+
+drawsParser :: Parser [GameDraw]
+drawsParser = gameDrawParser `sepBy` (string ", ")
+
+multiDrawsParser :: Parser [[GameDraw]]
+multiDrawsParser = drawsParser `sepBy` (string "; ")
+
+gameInfoParser :: Parser GameInfo
+gameInfoParser = do
+  gid <- gameIdParser
+  _ <- string ": "
+  drawsSeq <- multiDrawsParser
+  return $ GameInfo gid (concat drawsSeq)
+
+

@@ -15,7 +15,6 @@ import Data.List (any, isPrefixOf, stripPrefix, isInfixOf, foldl', foldl1, permu
 import Data.List.Split (splitOn)
 import Data.Maybe (fromJust)
 import Data.Word
-import qualified Data.Text as T
 import Debug.Trace (trace)
 import Text.Parsec
 import Text.Parsec.Error (ParseError)
@@ -23,6 +22,8 @@ import Text.Parsec.String (Parser)
 import Text.Regex.PCRE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import qualified Data.Text as T
+
 
 import Foreign.C.String
 import Foreign.C.Types
@@ -541,23 +542,59 @@ solve2015Day11 lines =
         if predicate newValue then newValue
         else applyUntil predicate function newValue
 
+-- ========== 2015 Day 12 ==========
+
+solve2015Day12 :: Solver
+solve2015Day12 lines =
+  let
+    partOne = show $ sum $ map (read :: String -> Int) $ filter (not . isEmpty) $ splitOn "," $ onlyNumbers $ head lines
+    partTwo = "Part Two"
+  in
+    return $ formatSolution "2015 Day 12" partOne partTwo
+
+  where
+    isEmpty :: String -> Bool
+    isEmpty "" = True
+    isEmpty _ = False
+
+    onlyNumbers :: String -> String
+    onlyNumbers "" = ""
+    onlyNumbers (c:cs)
+      | (c `elem` ['-', ',']) || (isDigit c) = c : onlyNumbers cs
+      | otherwise = onlyNumbers cs
+
+
+-- ========== 2016 Day 1 ==========
+
+{-
+data WalkInstruction = N Int | E Int
+data WalkPosition = WalkPosition { north :: Int, east :: Int }
+
+parseInstruction :: String -> WalkInstruction
+parseInstruction s =
+
+walk :: WalkPosition -> WalkInstruction -> WalkPosition
+walk (WalkPosition n e) (N steps) = WalkPosition (n + steps) e
+walk (WalkPosition n e) (E steps) = WalkPosition n (e + steps)
+
+solve2016Day1 :: Solver
+solve2016Day1 lines =
+  let
+    partOne = show $ map (filter (\c -> c /= ' ')) $ splitOn "," $ head lines
+    partTwo = "Part Two"
+  in
+    return $ formatSolution "2016 Day 1" partOne partTwo
+-}
+
+
+
 -- ========== 2023 Day 1 ==========
 
 solve2023Day1 :: Solver
 solve2023Day1 lines =
   let
-    example = [
-            "two1nine",
-            "eightwothree",
-            "abcone2threexyz",
-            "xtwone3four",
-            "4nineeightseven2",
-            "zoneight234",
-            "7pqrstsixteen"
-              ]
-
     partOne = show $ sum $ map buildNumber $ lines
-    partTwo = show $ sum $ map buildNumber $ map replaceNumberWords $ lines
+    partTwo = show $ sum $ map (buildNumber . replaceNumberWords) $ lines
   in
     return $ formatSolution "2023 Day 1" partOne partTwo
   where
@@ -583,5 +620,62 @@ solve2023Day1 lines =
       | "eight" `isPrefixOf` (c:cs) = "8" ++ replaceNumberWords cs
       | "nine" `isPrefixOf` (c:cs) = "9" ++ replaceNumberWords cs
       | otherwise = c : replaceNumberWords cs
+
+-- ========== 2023 Day 2 ==========
+
+parseGameInfo :: String -> Either ParseError GameInfo
+parseGameInfo = parse gameInfoParser ""
+
+maxColor :: DrawColor -> GameInfo -> GameDraw
+maxColor color (GameInfo _ drs) =
+  let
+    sameColor = filter (`isColor` color) drs
+  in
+    maximum sameColor
+  where
+    isColor :: GameDraw -> DrawColor -> Bool
+    isColor (GameDraw c _) color = c == color
+
+isPossibleGame :: Int -> Int -> Int -> GameInfo -> Bool
+isPossibleGame r g b game =
+  let
+    maxRed = maxColor Red game
+    maxGreen = maxColor Green game
+    maxBlue = maxColor Blue game
+    checkRed = GameDraw Red r
+    checkGreen = GameDraw Green g
+    checkBlue = GameDraw Blue b
+  in
+    maxRed <= checkRed && maxBlue <= checkBlue && maxGreen <= checkGreen
+
+drawsPower :: [GameDraw] -> Int
+drawsPower = foldl (*) 1 . map getVal
+  where
+    getVal :: GameDraw -> Int
+    getVal (GameDraw _ i) = i
+
+maxOfEachColor :: GameInfo -> [GameDraw]
+maxOfEachColor game =
+  let
+    maxRed = maxColor Red game
+    maxGreen = maxColor Green game
+    maxBlue = maxColor Blue game
+  in
+    [maxRed, maxGreen, maxBlue]
+
+solve2023Day2 :: Solver
+solve2023Day2 lines =
+  let
+    games :: [GameInfo]
+    games = rights $ map parseGameInfo lines
+
+    possibleGames :: [GameInfo]
+    possibleGames = filter (isPossibleGame 12 13 14) games
+
+    partOne = show $ sum $ map gameID possibleGames
+    partTwo = show $ sum $ map (drawsPower . maxOfEachColor) games
+  in
+    return $ formatSolution "2023 Day 2" partOne partTwo
+
 
 

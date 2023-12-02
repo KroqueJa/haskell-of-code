@@ -11,6 +11,8 @@ main :: IO ()
 main = do
   putStrLn "\n\n<<<<<<<<<< ======= AoC 2015 ======= >>>>>>>>>>\n\n"
   solve inputs2015
+--  putStrLn "\n\n<<<<<<<<<< ======= AoC 2016 ======= >>>>>>>>>>\n\n"
+--  solve inputs2016
   putStrLn "\n\n<<<<<<<<<< ======= AoC 2023 ======= >>>>>>>>>>\n\n"
   solve inputs2023
   where
@@ -25,8 +27,16 @@ main = do
 --                          InputWrapper "y2015d8.txt" solve2015Day8,
 --                          InputWrapper "y2015d9.txt" solve2015Day9,
 --                          InputWrapper "y2015d10.txt" solve2015Day10,
---                          InputWrapper "y2015d11.txt" solve2015Day11
+--                          InputWrapper "y2015d11.txt" solve2015Day11,
+--                          InputWrapper "y2015d12.txt" solve2015Day12,
                         ]
+
+{-
+    inputs2016 = [
+                            InputWrapper "y2016d1.txt" solve2016Day1
+                ]
+-}
     inputs2023 = [
-                            InputWrapper "y2023d1.txt" solve2023Day1
-                        ]
+                            InputWrapper "y2023d1.txt" solve2023Day1,
+                            InputWrapper "y2023d2.txt" solve2023Day2
+                    ]

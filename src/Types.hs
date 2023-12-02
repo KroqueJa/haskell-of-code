@@ -118,5 +118,23 @@ data Trip = Trip {
 type DistanceCatalog = M.Map TownPair Int
 type Route = [TownID]
 
+-- ========== 2023 Day 2 ==========
+type GameID = Int
+data DrawColor = Red | Green | Blue deriving (Show, Eq)
+data GameDraw = GameDraw DrawColor Int deriving (Show)
+
+instance Eq GameDraw where
+  (GameDraw c1 i1) == (GameDraw c2 i2) = (c1 == c2) && (i1 == i2)
+
+instance Ord GameDraw where
+  compare (GameDraw c1 i1) (GameDraw c2 i2)
+    | i1 < i2   = LT
+    | i1 > i2   = GT
+    | otherwise = EQ
+
+data GameInfo = GameInfo {
+                    gameID :: GameID,
+                    draws :: [GameDraw]
+                  } deriving (Show)
 
 
